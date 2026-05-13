@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proxy Service</title>
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@3.7.2/dist/vuetify.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7/css/materialdesignicons.min.css" rel="stylesheet" />
+  <style>
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body>
+  <div id="app" v-cloak></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@3.7.2/dist/vuetify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue-router@4/dist/vue-router.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1/dist/axios.min.js"></script>
+
+  <script>
+    const { createApp, ref, onMounted, onUnmounted } = Vue;
+    const { createVuetify } = Vuetify;
+    const { createRouter, createWebHashHistory } = VueRouter;
+
+    axios.interceptors.request.use(cfg => {
+      const token = localStorage.getItem('token');
+      if (token) cfg.headers.Authorization = `Bearer ${token}`;
+      return cfg;
+    });
+
+    // ─── Register ─────────────────────────────────────────────────────────────
+    const RegisterPage = {
+      template: `
+        <v-container class="fill-height" fluid>
+          <v-row justify="center" align="center">
+            <v-col cols="12" sm="8" md="5">
+              <v-card elevation="4" rounded="lg">
+                <v-card-title class="text-h5 pa-6">Регистрация</v-card-title>
+                <v-card-text>
+                  <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
+                  <v-alert v-if="success" type="success" class="mb-4">{{ success }}</v-alert>
+                  <v-text-field v-model="email" label="Email" type="email" variant="outlined" class="mb-3" />
+                  <v-text-field v-model="password" label="Пароль" type="password" variant="outlined" class="mb-3" />
+                  <v-text-field v-model="confirm" label="Подтверждение пароля" type="password" variant="outlined" />
+                </v-card-text>
+                <v-card-actions class="px-6 pb-4">
+                  <v-btn color="primary" block size="large" :loading="loading" @click="register">
+                    Зарегистрироваться
+                  </v-btn>
+                </v-card-actions>
+                <v-card-text class="text-center pt-0">
+                  <router-link to="/login">Уже есть аккаунт? Войти</router-link>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-container>
+      `,
+      setup() {
+        const email = ref('');
+        const password = ref('');
+        const confirm = ref('');
+        const error = ref('');
+        const success = ref('');
+        const loading = ref(false);
+        const router = VueRouter.useRouter();
+
+        async function register() {
+          error.value = '';
+          success.value = '';
+          if (password.value !== confirm.value) {
+            error.value = 'Пароли не совпадают';
+            return;
+          }
+          loading.value = true;
+          try {
+            await axios.post('/auth/register', { email: email.value, password: password.value });
+            success.value = 'Письмо с ключом отправлено на почту.';
+            setTimeout(() => router.push('/login'), 2500);
+          } catch (e) {
+            error.value = e.response?.data?.detail || 'Ошибка регистрации';
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        return { email, password, confirm, error, success, loading, register };
+      },
+    };
+
+    // ─── Login ────────────────────────────────────────────────────────────────
+    const LoginPage = {
+      template: `
+        <v-container class="fill-height" fluid>
+          <v-row justify="center" align="center">
+            <v-col cols="12" sm="8" md="5">
+              <v-card elevation="4" rounded="lg">
+                <v-card-title class="text-h5 pa-6">Вход</v-card-title>
+                <v-card-text>
+                  <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
+                  <v-text-field v-model="email" label="Email" type="email" variant="outlined" class="mb-3" />
+                  <v-text-field v-model="password" label="Пароль" type="password" variant="outlined" />
+                </v-card-text>
+                <v-card-actions class="px-6 pb-4">
+                  <v-btn color="primary" block size="large" :loading="loading" @click="login">
+                    Войти
+                  </v-btn>
+                </v-card-actions>
+                <v-card-text class="text-center pt-0">
+                  <router-link to="/register">Нет аккаунта? Зарегистрироваться</router-link>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-container>
+      `,
+      setup() {
+        const email = ref('');
+        const password = ref('');
+        const error = ref('');
+        const loading = ref(false);
+        const router = VueRouter.useRouter();
+
+        async function login() {
+          error.value = '';
+          loading.value = true;
+          try {
+            const { data } = await axios.post('/auth/login', { email: email.value, password: password.value });
+            localStorage.setItem('token', data.access_token);
+            router.push('/profile');
+          } catch (e) {
+            error.value = e.response?.data?.detail || 'Неверный email или пароль';
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        return { email, password, error, loading, login };
+      },
+    };
+
+    // ─── Profile ──────────────────────────────────────────────────────────────
+    const ProfilePage = {
+      template: `
+        <v-container class="py-8">
+          <v-row justify="center">
+            <v-col cols="12" md="8">
+
+              <v-alert v-if="msg" :type="msgType" class="mb-4" closable @click:close="msg = ''">
+                {{ msg }}
+              </v-alert>
+
+              <!-- Профиль -->
+              <v-card class="mb-4" elevation="2" rounded="lg">
+                <v-card-title class="pa-6">Личный кабинет</v-card-title>
+                <v-card-text v-if="profile">
+                  <v-list-item prepend-icon="mdi-email" :subtitle="profile.email" title="Email" />
+                  <v-divider />
+                  <v-list-item
+                    prepend-icon="mdi-key"
+                    :subtitle="profile.activation_key || '(ключ использован или не выдан)'"
+                    title="Ключ активации"
+                  >
+                    <template v-slot:append>
+                      <v-btn
+                        v-if="profile.activation_key"
+                        icon
+                        variant="text"
+                        size="small"
+                        :color="copied ? 'success' : 'default'"
+                        @click="copyKey"
+                      >
+                        <v-icon>{{ copied ? 'mdi-check' : 'mdi-content-copy' }}</v-icon>
+                        <v-tooltip activator="parent">Скопировать ключ</v-tooltip>
+                      </v-btn>
+                    </template>
+                  </v-list-item>
+                </v-card-text>
+                <v-card-text v-else>
+                  <v-skeleton-loader type="list-item-two-line" />
+                </v-card-text>
+                <v-card-actions class="px-6 pb-6">
+                  <v-btn color="primary" prepend-icon="mdi-refresh" :loading="refreshing" @click="refreshKey">
+                    Обновить ключ
+                  </v-btn>
+                  <v-spacer />
+                  <v-btn variant="text" color="error" prepend-icon="mdi-logout" @click="logout">
+                    Выйти
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+
+              <!-- Статус WebSocket -->
+              <v-card class="mb-4" elevation="2" rounded="lg">
+                <v-card-title class="pa-6">Статус подключения</v-card-title>
+                <v-card-text>
+                  <v-chip :color="wsStatus === 'connected' ? 'success' : 'default'" class="mb-3">
+                    {{ wsStatus === 'connected' ? 'Подключено' : 'Отключено' }}
+                  </v-chip>
+                  <div v-if="vmInfo">
+                    <div><b>Хост:</b> {{ vmInfo.host }}</div>
+                    <div><b>Порт:</b> {{ vmInfo.port }}</div>
+                    <div><b>Протокол:</b> {{ vmInfo.protocol }}</div>
+                  </div>
+                </v-card-text>
+              </v-card>
+
+              <!-- Смена пароля -->
+              <v-card elevation="2" rounded="lg">
+                <v-card-title class="pa-6">Сменить пароль</v-card-title>
+                <v-card-text>
+                  <v-text-field v-model="oldPass" label="Текущий пароль" type="password" variant="outlined" class="mb-3" />
+                  <v-text-field v-model="newPass" label="Новый пароль" type="password" variant="outlined" />
+                </v-card-text>
+                <v-card-actions class="px-6 pb-6">
+                  <v-btn color="secondary" :loading="changingPass" @click="changePassword">
+                    Сменить пароль
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+
+            </v-col>
+          </v-row>
+        </v-container>
+      `,
+      setup() {
+        const router = VueRouter.useRouter();
+        const profile = ref(null);
+        const wsStatus = ref('disconnected');
+        const vmInfo = ref(null);
+        const msg = ref('');
+        const msgType = ref('success');
+        const refreshing = ref(false);
+        const copied = ref(false);
+        const oldPass = ref('');
+        const newPass = ref('');
+        const changingPass = ref(false);
+        let ws = null;
+
+        async function loadProfile() {
+          try {
+            const { data } = await axios.get('/api/profile');
+            profile.value = data;
+            connectWs(data.id);
+          } catch {
+            router.push('/login');
+          }
+        }
+
+        function connectWs(userId) {
+          const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+          ws = new WebSocket(`${proto}://${location.host}/ws/status/${userId}`);
+          ws.onmessage = (e) => {
+            const d = JSON.parse(e.data);
+            wsStatus.value = d.status;
+            vmInfo.value = d.status === 'connected'
+              ? { host: d.host, port: d.port, protocol: d.protocol }
+              : null;
+          };
+          ws.onclose = () => { wsStatus.value = 'disconnected'; };
+        }
+
+        async function copyKey() {
+          await navigator.clipboard.writeText(profile.value.activation_key);
+          copied.value = true;
+          setTimeout(() => { copied.value = false; }, 2000);
+        }
+
+        async function refreshKey() {
+          refreshing.value = true;
+          try {
+            await axios.post('/api/profile/refresh-key');
+            msg.value = 'Новый ключ отправлен на почту';
+            msgType.value = 'success';
+            await loadProfile();
+          } catch (e) {
+            msg.value = e.response?.data?.detail || 'Ошибка';
+            msgType.value = 'error';
+          } finally {
+            refreshing.value = false;
+          }
+        }
+
+        async function changePassword() {
+          changingPass.value = true;
+          try {
+            await axios.post('/api/profile/change-password', {
+              old_password: oldPass.value,
+              new_password: newPass.value,
+            });
+            msg.value = 'Пароль изменён';
+            msgType.value = 'success';
+            oldPass.value = '';
+            newPass.value = '';
+          } catch (e) {
+            msg.value = e.response?.data?.detail || 'Ошибка';
+            msgType.value = 'error';
+          } finally {
+            changingPass.value = false;
+          }
+        }
+
+        function logout() {
+          localStorage.removeItem('token');
+          if (ws) ws.close();
+          router.push('/login');
+        }
+
+        onMounted(loadProfile);
+        onUnmounted(() => { if (ws) ws.close(); });
+
+        return {
+          profile, wsStatus, vmInfo, msg, msgType,
+          refreshing, refreshKey, copied, copyKey,
+          oldPass, newPass, changingPass, changePassword,
+          logout,
+        };
+      },
+    };
+
+    // ─── Router ───────────────────────────────────────────────────────────────
+    const router = createRouter({
+      history: createWebHashHistory(),
+      routes: [
+        { path: '/', redirect: '/login' },
+        { path: '/register', component: RegisterPage },
+        { path: '/login', component: LoginPage },
+        { path: '/profile', component: ProfilePage },
+      ],
+    });
+
+    // ─── App ──────────────────────────────────────────────────────────────────
+    const vuetify = createVuetify({ theme: { defaultTheme: 'light' } });
+
+    const App = {
+      template: `
+        <v-app>
+          <v-app-bar color="primary" flat>
+            <v-app-bar-title>Proxy Service</v-app-bar-title>
+          </v-app-bar>
+          <v-main>
+            <router-view />
+          </v-main>
+        </v-app>
+      `,
+    };
+
+    createApp(App).use(vuetify).use(router).mount('#app');
+  </script>
+</body>
+</html>
