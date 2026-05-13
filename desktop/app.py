@@ -23,6 +23,7 @@ class ProxyApp(tk.Tk):
         self._token = None
 
         self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,21 @@ class ProxyApp(tk.Tk):
     def _set_status(self, text: str, color: str):
         self._status_var.set(text)
         self._status_label.config(fg=color)
+
+    def _on_close(self):
+        if self._ws:
+            self._ws.close()
+            self._ws = None
+        if self._user_id and self._token:
+            try:
+                requests.post(
+                    f"{API_URL}/api/disconnect",
+                    headers={"Authorization": f"Bearer {self._token}"},
+                    timeout=5,
+                )
+            except Exception:
+                pass
+        self.destroy()
 
     def destroy(self):
         if self._ws:

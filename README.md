@@ -23,7 +23,7 @@
 
 ```bash
 git clone <url-репозитория>
-cd proxy
+cd test-proxy-service
 
 # Создать файл с переменными окружения
 cp .env.example .env
@@ -103,7 +103,7 @@ POST http://localhost/auth/register
 ### Способ 2 — Лог Celery (для разработчиков)
 
 ```bash
-docker logs proxy-celery-1 | grep -A 5 "ACTIVATION KEY"
+docker logs test-proxy-service-celery-1 --follow 2>&1 | grep -A 10 -B 1 'Здравствуйте'
 ```
 
 Пример вывода:
@@ -135,18 +135,19 @@ docker logs proxy-celery-1 | grep -A 5 "ACTIVATION KEY"
 ### Установка зависимостей (один раз)
 
 ```bash
+cd desktop
 pip install requests websocket-client
 ```
 
 > На Windows, если используется несколько версий Python:
 > ```bash
+> cd desktop
 > py -3 -m pip install requests websocket-client
 > ```
 
 ### Запуск
 
 ```bash
-cd desktop
 python app.py
 ```
 
